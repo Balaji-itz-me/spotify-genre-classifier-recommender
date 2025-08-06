@@ -95,40 +95,57 @@ def load_models():
 def get_model_features(scaler_model, df_sample=None):
     """Get the exact feature names that the model expects"""
     try:
-        # Try to get features from the scaler
+        # Try to get features from the scaler first
         if hasattr(scaler_model, 'feature_names_in_'):
-            return scaler_model.feature_names_in_.tolist()
+            features = scaler_model.feature_names_in_.tolist()
+            st.sidebar.info(f"Got {len(features)} features from scaler")
+            return features
         
-        # If scaler doesn't have feature names, try to infer from dataset
+        # If no feature names in scaler, try from the dataset
         if df_sample is not None:
-            # Common features that are typically used for music prediction
+            # These are the most common features for music analysis
+            # Including 'cluster' which your model clearly expects
             potential_features = [
                 'danceability', 'energy', 'loudness', 'speechiness', 
                 'acousticness', 'instrumentalness', 'liveness', 'valence', 
                 'tempo', 'duration_ms', 'explicit', 'key', 'mode', 
-                'time_signature', 'cluster'
+                'time_signature', 'cluster'  # Make sure cluster is included
             ]
             
-            # Return only features that exist in the dataset
-            available_features = [f for f in potential_features if f in df_sample.columns]
-            return available_features[:15]  # Limit to 15 features as expected by model
+            # Return only features that exist in the dataset, but prioritize 'cluster'
+            available_features = []
+            
+            # First, add cluster if it exists (it's clearly required)
+            if 'cluster' in df_sample.columns:
+                available_features.append('cluster')
+            
+            # Then add other features
+            for feature in potential_features:
+                if feature in df_sample.columns and feature not in available_features:
+                    available_features.append(feature)
+            
+            # If we don't have enough features, add cluster anyway (with default value)
+            if len(available_features) < 15 and 'cluster' not in available_features:
+                available_features.append('cluster')
+            
+            return available_features[:15]  # Return exactly 15 features
         
-        # Fallback: Most common 15 features for music analysis
+        # Fallback: The exact 15 features your model expects (based on error message)
         return [
             'danceability', 'energy', 'loudness', 'speechiness', 
             'acousticness', 'instrumentalness', 'liveness', 'valence', 
             'tempo', 'duration_ms', 'explicit', 'key', 'mode', 
-            'time_signature', 'cluster'
+            'time_signature', 'cluster'  # cluster MUST be included
         ]
         
     except Exception as e:
         st.warning(f"Could not determine model features: {e}")
-        # Return exactly 15 most important features
+        # Return exactly 15 features with cluster included
         return [
             'danceability', 'energy', 'loudness', 'speechiness', 
             'acousticness', 'instrumentalness', 'liveness', 'valence', 
             'tempo', 'duration_ms', 'key', 'mode', 'time_signature', 
-            'explicit', 'cluster'
+            'explicit', 'cluster'  # cluster is essential
         ]
 
 def create_complete_feature_vector(user_inputs, required_features, df_sample=None):
@@ -141,7 +158,7 @@ def create_complete_feature_vector(user_inputs, required_features, df_sample=Non
         'key': 5,
         'mode': 1,
         'time_signature': 4,
-        'cluster': 0,
+        'cluster': 0,  # This is crucial - your model expects this feature
         'popularity': 50,
     }
     
@@ -154,23 +171,34 @@ def create_complete_feature_vector(user_inputs, required_features, df_sample=Non
                 except:
                     pass
     
-    # Build complete feature vector - ONLY include required features
+    # Build complete feature vector - ONLY include required features IN THE CORRECT ORDER
     complete_features = {}
     
     for feature in required_features:
         if feature in user_inputs:
-            complete_features[feature] = [user_inputs[feature]]
+            complete_features[feature] = user_inputs[feature]
         elif feature in defaults:
-            complete_features[feature] = [defaults[feature]]
+            complete_features[feature] = defaults[feature]
         else:
-            complete_features[feature] = [0.0]  # Last resort default
+            complete_features[feature] = 0.0  # Last resort default
     
-    # Create DataFrame and ensure we have exactly the right number of features
-    df = pd.DataFrame(complete_features)
+    # Create DataFrame with the EXACT column names the model expects
+    df = pd.DataFrame([complete_features])  # Note: wrap in list to create single row
+    
+    # Ensure columns are in the same order as required_features
+    df = df[required_features]
     
     # Debug info
     st.sidebar.info(f"Features created: {len(df.columns)}")
     st.sidebar.info(f"Expected: {len(required_features)}")
+    st.sidebar.info(f"Column names match: {list(df.columns) == required_features}")
+    
+    # Show which features we're using
+    with st.sidebar.expander("Feature Details"):
+        for feature in required_features:
+            value = complete_features.get(feature, 'Missing')
+            source = "User" if feature in user_inputs else "Default"
+            st.write(f"{feature}: {value} ({source})")
     
     return df
 def create_feature_inputs():
@@ -439,4 +467,5 @@ def main():
         recommendation_module()
 
 if __name__ == "__main__":
+
     main()
