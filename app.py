@@ -267,55 +267,46 @@ def debug_model_features(models, df_sample=None):
     return None
 
 def get_exact_model_features(models, df_sample=None):
-    """Get the EXACT features the model expects"""
+    """Get the EXACT 15 features the model expects"""
     
-    # First, try to get from scaler
+    # The RandomForestRegressor expects exactly 15 features
+    # We need to determine which 15 features from the scaler to use
+    
+    scaler_features = None
     if 'scaler' in models and hasattr(models['scaler'], 'feature_names_in_'):
-        return models['scaler'].feature_names_in_.tolist()
+        scaler_features = models['scaler'].feature_names_in_.tolist()
+        st.info(f"Scaler has {len(scaler_features)} features")
     
-    # If that fails, try to infer from the popularity model
-    if 'popularity' in models:
-        try:
-            # Some models store feature names
-            pop_model = models['popularity']
-            if hasattr(pop_model, 'feature_names_in_'):
-                return pop_model.feature_names_in_.tolist()
-        except:
-            pass
+    # If scaler has exactly 15 features, use them all
+    if scaler_features and len(scaler_features) == 15:
+        return scaler_features
     
-    # Manual reconstruction based on common patterns
-    # Since your model expects 15 features and needs 'cluster'
-    if df_sample is not None:
-        # Get numeric columns that are likely features
-        numeric_cols = df_sample.select_dtypes(include=[np.number]).columns.tolist()
+    # If scaler has more than 15, we need to select the right 15
+    if scaler_features and len(scaler_features) > 15:
+        st.warning(f"Scaler has {len(scaler_features)} features, but model needs 15")
         
-        # Audio features (these are almost certainly included)
-        audio_features = ['danceability', 'energy', 'loudness', 'speechiness', 
-                         'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo']
+        # Priority order for feature selection
+        priority_features = [
+            'danceability', 'energy', 'loudness', 'speechiness', 
+            'acousticness', 'instrumentalness', 'liveness', 'valence', 
+            'tempo', 'duration_ms', 'key', 'mode', 'time_signature', 
+            'explicit', 'cluster'
+        ]
         
-        # Other likely features
-        other_features = ['duration_ms', 'explicit', 'key', 'mode', 'time_signature', 'cluster']
+        # Select features in priority order that exist in scaler
+        selected_features = []
+        for feat in priority_features:
+            if feat in scaler_features and len(selected_features) < 15:
+                selected_features.append(feat)
         
-        # Build feature list from what's available
-        feature_list = []
+        # If we still don't have 15, add remaining scaler features
+        for feat in scaler_features:
+            if feat not in selected_features and len(selected_features) < 15:
+                selected_features.append(feat)
         
-        # Add audio features first (priority)
-        for feat in audio_features:
-            if feat in numeric_cols:
-                feature_list.append(feat)
-        
-        # Add other features
-        for feat in other_features:
-            if feat in numeric_cols:
-                feature_list.append(feat)
-        
-        # If we still don't have cluster, add it anyway (model needs it)
-        if 'cluster' not in feature_list:
-            feature_list.append('cluster')
-        
-        return feature_list[:15]  # Return exactly 15
+        return selected_features[:15]
     
-    # Ultimate fallback - most common 15 features for music models
+    # Fallback: Standard 15 features for music analysis
     return [
         'danceability', 'energy', 'loudness', 'speechiness', 
         'acousticness', 'instrumentalness', 'liveness', 'valence', 
@@ -388,6 +379,12 @@ def safe_predict_popularity():
             st.warning("⚠️ Using inferred features")
             required_features = get_exact_model_features(models, df_sample)
         
+        # CRITICAL: Ensure exactly 15 features
+        if len(required_features) != 15:
+            st.error(f"❌ Feature count mismatch: got {len(required_features)}, need exactly 15")
+            required_features = required_features[:15] if len(required_features) > 15 else required_features
+            st.warning(f"Truncated to {len(required_features)} features")
+        
         st.write(f"**Will use these {len(required_features)} features:**")
         for i, feat in enumerate(required_features, 1):
             st.write(f"{i}. {feat}")
@@ -400,35 +397,48 @@ def safe_predict_popularity():
             models = st.session_state.models
             df_sample = st.session_state.df if 'df' in st.session_state else None
             
-            # Get exact features
+            # Get exactly 15 features
             required_features = get_exact_model_features(models, df_sample)
             
-            st.info(f"Using {len(required_features)} features: {required_features}")
+            # Double check - must be exactly 15
+            if len(required_features) != 15:
+                st.error(f"❌ Wrong number of features: {len(required_features)}")
+                required_features = required_features[:15]  # Force to 15
+                st.warning(f"Forced to 15 features: {required_features}")
+            
+            st.info(f"Using exactly {len(required_features)} features")
             
             # Create feature DataFrame
             features_df = create_feature_dataframe(user_inputs, required_features, df_sample)
             
+            # Verify DataFrame has exactly 15 columns
+            if features_df.shape[1] != 15:
+                st.error(f"❌ DataFrame has {features_df.shape[1]} columns, need 15")
+                return
+            
             st.write("**Created DataFrame:**")
             st.write(f"Shape: {features_df.shape}")
-            st.write(f"Columns: {list(features_df.columns)}")
+            st.write(f"Columns ({len(features_df.columns)}): {list(features_df.columns)}")
             st.dataframe(features_df)
-            
-            # Check if features match what scaler expects
-            if hasattr(models['scaler'], 'feature_names_in_'):
-                scaler_features = models['scaler'].feature_names_in_.tolist()
-                if list(features_df.columns) == scaler_features:
-                    st.success("✅ Features match scaler exactly!")
-                else:
-                    st.error("❌ Feature mismatch with scaler!")
-                    st.write("DataFrame columns:", list(features_df.columns))
-                    st.write("Scaler expects:", scaler_features)
-                    return
             
             # Scale features
             scaled_features = models['scaler'].transform(features_df)
             st.write(f"Scaled features shape: {scaled_features.shape}")
             
-            # Predict
+            # CRITICAL: Verify scaled features has exactly 15 columns
+            if scaled_features.shape[1] != 15:
+                st.error(f"❌ Scaled features has {scaled_features.shape[1]} columns, model expects 15")
+                
+                # Try to fix by selecting first 15 features
+                if scaled_features.shape[1] > 15:
+                    st.warning("Truncating scaled features to first 15 columns")
+                    scaled_features = scaled_features[:, :15]
+                    st.write(f"New scaled features shape: {scaled_features.shape}")
+                else:
+                    st.error("Cannot proceed - not enough features after scaling")
+                    return
+            
+            # Now predict
             prediction = models['popularity'].predict(scaled_features)[0]
             
             st.success(f"🎵 Predicted Popularity: **{prediction:.1f}/100**")
@@ -616,4 +626,5 @@ def main():
 if __name__ == "__main__":
 
     main()
+
 
