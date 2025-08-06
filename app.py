@@ -420,53 +420,208 @@ def popularity_module():
     """Enhanced popularity module with debugging"""
     safe_predict_popularity()
 def genre_module():
-    """Genre classification module"""
+    """Genre classification module with proper cluster handling"""
     st.header("🎼 Genre Classification")
     
     if 'models' not in st.session_state or 'super_genre' not in st.session_state.models:
         st.error("Genre model not available")
         return
     
+    # Get user inputs for audio features
     user_inputs = create_feature_inputs()
     
-    if st.button("Classify Genre", type="primary"):
+    # Add cluster selection for user
+    st.subheader("🎯 Additional Settings")
+    cluster = st.selectbox(
+        "Music Cluster (style/pattern group):",
+        options=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        index=0,
+        help="Different music clusters represent different musical patterns and styles"
+    )
+    
+    # Add cluster to user inputs
+    user_inputs['cluster'] = cluster
+    
+    if st.button("🎼 Classify Genre", type="primary"):
         try:
             models = st.session_state.models
             df_sample = st.session_state.df if 'df' in st.session_state else None
             
-            # Get required features for the model
-            required_features = get_model_features(models['scaler'], df_sample)
+            # Get the exact features the scaler expects
+            if 'scaler' in models and hasattr(models['scaler'], 'feature_names_in_'):
+                required_features = models['scaler'].feature_names_in_.tolist()
+                st.info(f"Model expects {len(required_features)} features from scaler")
+            else:
+                # Fallback - include cluster which is essential
+                required_features = [
+                    'danceability', 'energy', 'loudness', 'speechiness', 
+                    'acousticness', 'instrumentalness', 'liveness', 'valence', 
+                    'tempo', 'duration_ms', 'key', 'mode', 'time_signature', 
+                    'explicit', 'cluster'
+                ]
+                st.info(f"Using fallback features: {len(required_features)} features")
             
-            # Ensure exactly 15 features
-            if len(required_features) != 15:
-                required_features = required_features[:15]
+            # Ensure cluster is in required features (it's essential for your model)
+            if 'cluster' not in required_features:
+                required_features.append('cluster')
+                st.info("Added 'cluster' to required features")
             
-            # Create complete feature vector with defaults
-            features_df = create_complete_feature_vector(user_inputs, required_features, df_sample)
+            # Create complete feature vector
+            features_df = create_feature_dataframe(user_inputs, required_features, df_sample)
             
-            # Verify feature count
-            if features_df.shape[1] != 15:
-                st.error(f"Feature count mismatch: {features_df.shape[1]} != 15")
-                return
+            # Debug: Show what we're sending to the model
+            with st.expander("🔍 Feature Details"):
+                st.write(f"Created DataFrame shape: {features_df.shape}")
+                st.write("Features being used:")
+                for col in features_df.columns:
+                    source = "User Input" if col in user_inputs else "Default"
+                    st.write(f"- {col}: {features_df[col].iloc[0]} ({source})")
             
-            # Scale and predict
-            scaled = models['scaler'].transform(features_df)
-            genre = models['super_genre'].predict(scaled)[0]
+            # Scale features first
+            scaled_features = models['scaler'].transform(features_df)
+            st.info(f"Scaled features shape: {scaled_features.shape}")
             
-            st.success(f"🎵 Predicted Genre: **{genre.upper()}**")
+            # If scaler includes target variables, remove them for model prediction
+            # For genre classification, we might need to remove 'super_genre' or 'popularity' if they were in training
+            target_columns = ['popularity', 'super_genre']  # Common target columns
+            target_indices = []
             
-            # Show confidence if available
+            for i, feat in enumerate(required_features):
+                if feat in target_columns:
+                    target_indices.append(i)
+            
+            # Remove target columns if they exist
+            if target_indices:
+                model_features = np.delete(scaled_features, target_indices, axis=1)
+                st.info(f"Removed {len(target_indices)} target columns for model prediction")
+                st.info(f"Final model features shape: {model_features.shape}")
+            else:
+                model_features = scaled_features
+                st.info("No target columns found to remove")
+            
+            # Predict genre
+            genre_prediction = models['super_genre'].predict(model_features)[0]
+            
+            # Display prediction
+            col1, col2, col3 = st.columns(3)
+            
+            with col2:  # Center the result
+                st.success(f"🎵 **Predicted Genre: {genre_prediction.upper()}**")
+            
+            # Show prediction confidence/probability if available
             try:
-                proba = models['super_genre'].predict_proba(scaled)[0]
-                confidence = proba.max()
-                st.info(f"Confidence: {confidence:.1%}")
-            except:
-                pass
+                probabilities = models['super_genre'].predict_proba(model_features)[0]
+                
+                if hasattr(models['super_genre'], 'classes_'):
+                    classes = models['super_genre'].classes_
+                    
+                    # Create probability dataframe
+                    prob_df = pd.DataFrame({
+                        'Genre': classes,
+                        'Probability': probabilities
+                    }).sort_values('Probability', ascending=False)
+                    
+                    st.subheader("🎯 Genre Probabilities")
+                    
+                    # Show top 5 predictions
+                    top_5 = prob_df.head(5)
+                    
+                    for idx, row in top_5.iterrows():
+                        confidence = row['Probability']
+                        genre = row['Genre']
+                        
+                        if confidence > 0.1:  # Only show if probability > 10%
+                            st.progress(confidence, text=f"{genre}: {confidence:.1%}")
+                    
+                    # Show confidence for the top prediction
+                    max_confidence = probabilities.max()
+                    if max_confidence >= 0.7:
+                        st.success(f"🎯 High confidence: {max_confidence:.1%}")
+                    elif max_confidence >= 0.4:
+                        st.info(f"📊 Moderate confidence: {max_confidence:.1%}")
+                    else:
+                        st.warning(f"🤔 Low confidence: {max_confidence:.1%} - The track might be a genre blend")
+                
+            except Exception as prob_error:
+                st.info("Confidence scores not available")
+            
+            # Create a simple feature visualization
+            try:
+                audio_features_only = ['danceability', 'energy', 'speechiness', 
+                                     'acousticness', 'instrumentalness', 'liveness', 'valence']
+                
+                feature_values = []
+                feature_names = []
+                
+                for feature in audio_features_only:
+                    if feature in user_inputs:
+                        feature_values.append(user_inputs[feature])
+                        feature_names.append(feature.capitalize())
+                
+                if feature_values and len(feature_values) >= 3:
+                    import plotly.graph_objects as go
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(
+                        r=feature_values,
+                        theta=feature_names,
+                        fill='toself',
+                        name=f'{genre_prediction} Profile',
+                        line_color='rgb(32, 201, 151)'
+                    ))
+                    
+                    fig.update_layout(
+                        polar=dict(
+                            radialaxis=dict(
+                                visible=True,
+                                range=[0, 1]
+                            )),
+                        showlegend=True,
+                        title=f"Audio Profile for {genre_prediction} Classification"
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            except Exception as viz_error:
+                st.info("Feature visualization not available")
                 
         except Exception as e:
-            st.error(f"Classification failed: {e}")
-            with st.expander("Error Details"):
-                st.code(str(e))
+            st.error(f"❌ Genre classification failed: {str(e)}")
+            
+            # Better error handling
+            if "feature names should match" in str(e).lower():
+                st.error("🔧 **Feature Mismatch Error**")
+                st.info("The genre model was trained with different features. Make sure 'cluster' is included.")
+                
+                # Show what features the model expects vs what we provided
+                if 'scaler' in st.session_state.models:
+                    scaler = st.session_state.models['scaler']
+                    if hasattr(scaler, 'feature_names_in_'):
+                        st.write("**Model expects these features:**")
+                        expected_features = scaler.feature_names_in_
+                        for i, feat in enumerate(expected_features):
+                            st.write(f"{i+1}. {feat}")
+                        
+                        # Show what we tried to provide
+                        provided_features = list(user_inputs.keys()) + ['cluster']
+                        st.write("**We provided these features:**")
+                        for i, feat in enumerate(provided_features):
+                            st.write(f"{i+1}. {feat}")
+                            
+                        # Show missing features
+                        missing = set(expected_features) - set(provided_features)
+                        if missing:
+                            st.write(f"**Missing features:** {list(missing)}")
+                        
+                        extra = set(provided_features) - set(expected_features)
+                        if extra:
+                            st.write(f"**Extra features:** {list(extra)}")
+            
+            elif "input contains nan" in str(e).lower():
+                st.error("📊 **Data Error**: Some features contain invalid values")
+            else:
+                with st.expander("🔍 Technical Details"):
+                    st.code(str(e))
 
 def recommendation_module():
     """Simple recommendation module"""
@@ -585,6 +740,7 @@ def main():
 if __name__ == "__main__":
 
     main()
+
 
 
 
