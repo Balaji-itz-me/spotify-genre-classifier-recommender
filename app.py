@@ -267,46 +267,48 @@ def debug_model_features(models, df_sample=None):
     return None
 
 def get_exact_model_features(models, df_sample=None):
-    """Get the EXACT 15 features the model expects"""
-    
-    # The RandomForestRegressor expects exactly 15 features
-    # We need to determine which 15 features from the scaler to use
+    """Get the EXACT features the model expects (excluding target variables)"""
     
     scaler_features = None
     if 'scaler' in models and hasattr(models['scaler'], 'feature_names_in_'):
         scaler_features = models['scaler'].feature_names_in_.tolist()
-        st.info(f"Scaler has {len(scaler_features)} features")
+        st.info(f"Scaler was trained with {len(scaler_features)} features")
+        st.write(f"Scaler features: {scaler_features}")
     
-    # If scaler has exactly 15 features, use them all
-    if scaler_features and len(scaler_features) == 15:
-        return scaler_features
+    if scaler_features:
+        # CRITICAL: Remove target variables that shouldn't be used for prediction
+        target_variables = ['popularity']  # Add other target variables if any
+        
+        # Remove target variables from scaler features
+        prediction_features = [feat for feat in scaler_features if feat not in target_variables]
+        
+        st.info(f"After removing targets: {len(prediction_features)} features remain")
+        st.write(f"Prediction features: {prediction_features}")
+        
+        # The model expects exactly 15 features (based on your error)
+        if len(prediction_features) == 15:
+            return prediction_features
+        elif len(prediction_features) > 15:
+            st.warning(f"Too many features ({len(prediction_features)}), selecting first 15")
+            return prediction_features[:15]
+        else:
+            st.error(f"Not enough features ({len(prediction_features)}), need 15")
+            # Pad with common features if needed
+            common_features = [
+                'danceability', 'energy', 'loudness', 'speechiness', 
+                'acousticness', 'instrumentalness', 'liveness', 'valence', 
+                'tempo', 'duration_ms', 'key', 'mode', 'time_signature', 
+                'explicit', 'cluster'
+            ]
+            
+            # Add missing features
+            for feat in common_features:
+                if feat not in prediction_features and len(prediction_features) < 15:
+                    prediction_features.append(feat)
+            
+            return prediction_features[:15]
     
-    # If scaler has more than 15, we need to select the right 15
-    if scaler_features and len(scaler_features) > 15:
-        st.warning(f"Scaler has {len(scaler_features)} features, but model needs 15")
-        
-        # Priority order for feature selection
-        priority_features = [
-            'danceability', 'energy', 'loudness', 'speechiness', 
-            'acousticness', 'instrumentalness', 'liveness', 'valence', 
-            'tempo', 'duration_ms', 'key', 'mode', 'time_signature', 
-            'explicit', 'cluster'
-        ]
-        
-        # Select features in priority order that exist in scaler
-        selected_features = []
-        for feat in priority_features:
-            if feat in scaler_features and len(selected_features) < 15:
-                selected_features.append(feat)
-        
-        # If we still don't have 15, add remaining scaler features
-        for feat in scaler_features:
-            if feat not in selected_features and len(selected_features) < 15:
-                selected_features.append(feat)
-        
-        return selected_features[:15]
-    
-    # Fallback: Standard 15 features for music analysis
+    # Fallback: Standard 15 features for music analysis (excluding popularity)
     return [
         'danceability', 'energy', 'loudness', 'speechiness', 
         'acousticness', 'instrumentalness', 'liveness', 'valence', 
@@ -315,9 +317,9 @@ def get_exact_model_features(models, df_sample=None):
     ]
 
 def create_feature_dataframe(user_inputs, required_features, df_sample=None):
-    """Create feature DataFrame with EXACT column names and order"""
+    """Create feature DataFrame with EXACT column names and order (excluding target variables)"""
     
-    # Default values for missing features
+    # Default values for missing features (excluding targets like popularity)
     defaults = {
         'duration_ms': 200000,
         'explicit': 0,
@@ -325,7 +327,7 @@ def create_feature_dataframe(user_inputs, required_features, df_sample=None):
         'mode': 1,
         'time_signature': 4,
         'cluster': 0,  # Essential - your model needs this
-        'popularity': 50,
+        # Note: NOT including 'popularity' as it's the target variable
     }
     
     # Get median values from dataset if available
@@ -339,9 +341,13 @@ def create_feature_dataframe(user_inputs, required_features, df_sample=None):
                 except:
                     pass
     
-    # Create feature dictionary in EXACT order
+    # Create feature dictionary in EXACT order (excluding target variables)
     feature_dict = {}
     for feature_name in required_features:
+        # Skip target variables
+        if feature_name in ['popularity']:
+            continue
+            
         if feature_name in user_inputs:
             feature_dict[feature_name] = user_inputs[feature_name]
         elif feature_name in defaults:
@@ -352,8 +358,9 @@ def create_feature_dataframe(user_inputs, required_features, df_sample=None):
     # Create DataFrame - CRITICAL: column names must match exactly
     df = pd.DataFrame([feature_dict])
     
-    # Ensure column order matches exactly
-    df = df[required_features]
+    # Ensure we only have the required features (no target variables)
+    final_features = [f for f in required_features if f not in ['popularity']]
+    df = df[final_features]
     
     return df
 
@@ -459,7 +466,6 @@ def safe_predict_popularity():
 def popularity_module():
     """Enhanced popularity module with debugging"""
     safe_predict_popularity()
-
 def genre_module():
     """Genre classification module"""
     st.header("🎼 Genre Classification")
@@ -626,5 +632,6 @@ def main():
 if __name__ == "__main__":
 
     main()
+
 
 
