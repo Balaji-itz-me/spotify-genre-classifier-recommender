@@ -267,67 +267,35 @@ def debug_model_features(models, df_sample=None):
     return None
 
 def get_exact_model_features(models, df_sample=None):
-    """Get the EXACT features the model expects (excluding target variables)"""
+    """Get the EXACT features the scaler expects (including target variables for scaling)"""
     
     scaler_features = None
     if 'scaler' in models and hasattr(models['scaler'], 'feature_names_in_'):
         scaler_features = models['scaler'].feature_names_in_.tolist()
         st.info(f"Scaler was trained with {len(scaler_features)} features")
         st.write(f"Scaler features: {scaler_features}")
+        return scaler_features  # Return ALL features the scaler needs
     
-    if scaler_features:
-        # CRITICAL: Remove target variables that shouldn't be used for prediction
-        target_variables = ['popularity']  # Add other target variables if any
-        
-        # Remove target variables from scaler features
-        prediction_features = [feat for feat in scaler_features if feat not in target_variables]
-        
-        st.info(f"After removing targets: {len(prediction_features)} features remain")
-        st.write(f"Prediction features: {prediction_features}")
-        
-        # The model expects exactly 15 features (based on your error)
-        if len(prediction_features) == 15:
-            return prediction_features
-        elif len(prediction_features) > 15:
-            st.warning(f"Too many features ({len(prediction_features)}), selecting first 15")
-            return prediction_features[:15]
-        else:
-            st.error(f"Not enough features ({len(prediction_features)}), need 15")
-            # Pad with common features if needed
-            common_features = [
-                'danceability', 'energy', 'loudness', 'speechiness', 
-                'acousticness', 'instrumentalness', 'liveness', 'valence', 
-                'tempo', 'duration_ms', 'key', 'mode', 'time_signature', 
-                'explicit', 'cluster'
-            ]
-            
-            # Add missing features
-            for feat in common_features:
-                if feat not in prediction_features and len(prediction_features) < 15:
-                    prediction_features.append(feat)
-            
-            return prediction_features[:15]
-    
-    # Fallback: Standard 15 features for music analysis (excluding popularity)
+    # Fallback: Include popularity because the scaler expects it
     return [
         'danceability', 'energy', 'loudness', 'speechiness', 
         'acousticness', 'instrumentalness', 'liveness', 'valence', 
         'tempo', 'duration_ms', 'key', 'mode', 'time_signature', 
-        'explicit', 'cluster'
+        'explicit', 'cluster', 'popularity'  # Include popularity for scaler
     ]
 
 def create_feature_dataframe(user_inputs, required_features, df_sample=None):
-    """Create feature DataFrame with EXACT column names and order (excluding target variables)"""
+    """Create feature DataFrame with EXACT column names and order (including targets for scaler)"""
     
-    # Default values for missing features (excluding targets like popularity)
+    # Default values for missing features (including targets for scaler compatibility)
     defaults = {
         'duration_ms': 200000,
         'explicit': 0,
         'key': 5,
         'mode': 1,
         'time_signature': 4,
-        'cluster': 0,  # Essential - your model needs this
-        # Note: NOT including 'popularity' as it's the target variable
+        'cluster': 0,
+        'popularity': 50,  # Include default popularity for scaler (will be removed before model)
     }
     
     # Get median values from dataset if available
@@ -341,13 +309,9 @@ def create_feature_dataframe(user_inputs, required_features, df_sample=None):
                 except:
                     pass
     
-    # Create feature dictionary in EXACT order (excluding target variables)
+    # Create feature dictionary in EXACT order (including all features scaler expects)
     feature_dict = {}
     for feature_name in required_features:
-        # Skip target variables
-        if feature_name in ['popularity']:
-            continue
-            
         if feature_name in user_inputs:
             feature_dict[feature_name] = user_inputs[feature_name]
         elif feature_name in defaults:
@@ -355,12 +319,11 @@ def create_feature_dataframe(user_inputs, required_features, df_sample=None):
         else:
             feature_dict[feature_name] = 0.0
     
-    # Create DataFrame - CRITICAL: column names must match exactly
+    # Create DataFrame - CRITICAL: column names must match scaler exactly
     df = pd.DataFrame([feature_dict])
     
-    # Ensure we only have the required features (no target variables)
-    final_features = [f for f in required_features if f not in ['popularity']]
-    df = df[final_features]
+    # Ensure column order matches exactly what scaler expects
+    df = df[required_features]
     
     return df
 
@@ -381,19 +344,13 @@ def safe_predict_popularity():
         
         if expected_features:
             st.success(f"✅ Found exact features: {len(expected_features)}")
-            required_features = expected_features
+            scaler_features = expected_features
         else:
             st.warning("⚠️ Using inferred features")
-            required_features = get_exact_model_features(models, df_sample)
+            scaler_features = get_exact_model_features(models, df_sample)
         
-        # CRITICAL: Ensure exactly 15 features
-        if len(required_features) != 15:
-            st.error(f"❌ Feature count mismatch: got {len(required_features)}, need exactly 15")
-            required_features = required_features[:15] if len(required_features) > 15 else required_features
-            st.warning(f"Truncated to {len(required_features)} features")
-        
-        st.write(f"**Will use these {len(required_features)} features:**")
-        for i, feat in enumerate(required_features, 1):
+        st.write(f"**Scaler expects these {len(scaler_features)} features:**")
+        for i, feat in enumerate(scaler_features, 1):
             st.write(f"{i}. {feat}")
     
     # Get user inputs
@@ -404,49 +361,45 @@ def safe_predict_popularity():
             models = st.session_state.models
             df_sample = st.session_state.df if 'df' in st.session_state else None
             
-            # Get exactly 15 features
-            required_features = get_exact_model_features(models, df_sample)
+            # Get ALL features that scaler expects (including targets)
+            scaler_features = get_exact_model_features(models, df_sample)
             
-            # Double check - must be exactly 15
-            if len(required_features) != 15:
-                st.error(f"❌ Wrong number of features: {len(required_features)}")
-                required_features = required_features[:15]  # Force to 15
-                st.warning(f"Forced to 15 features: {required_features}")
+            st.info(f"Creating DataFrame with {len(scaler_features)} features for scaler")
             
-            st.info(f"Using exactly {len(required_features)} features")
+            # Create feature DataFrame with ALL features scaler needs
+            features_df = create_feature_dataframe(user_inputs, scaler_features, df_sample)
             
-            # Create feature DataFrame
-            features_df = create_feature_dataframe(user_inputs, required_features, df_sample)
-            
-            # Verify DataFrame has exactly 15 columns
-            if features_df.shape[1] != 15:
-                st.error(f"❌ DataFrame has {features_df.shape[1]} columns, need 15")
-                return
-            
-            st.write("**Created DataFrame:**")
+            st.write("**Created DataFrame for Scaler:**")
             st.write(f"Shape: {features_df.shape}")
             st.write(f"Columns ({len(features_df.columns)}): {list(features_df.columns)}")
             st.dataframe(features_df)
             
-            # Scale features
+            # Scale ALL features (including target)
             scaled_features = models['scaler'].transform(features_df)
             st.write(f"Scaled features shape: {scaled_features.shape}")
             
-            # CRITICAL: Verify scaled features has exactly 15 columns
-            if scaled_features.shape[1] != 15:
-                st.error(f"❌ Scaled features has {scaled_features.shape[1]} columns, model expects 15")
-                
-                # Try to fix by selecting first 15 features
-                if scaled_features.shape[1] > 15:
-                    st.warning("Truncating scaled features to first 15 columns")
-                    scaled_features = scaled_features[:, :15]
-                    st.write(f"New scaled features shape: {scaled_features.shape}")
-                else:
-                    st.error("Cannot proceed - not enough features after scaling")
-                    return
+            # Now REMOVE the target variable columns from scaled features for model prediction
+            target_indices = []
+            for i, feat in enumerate(scaler_features):
+                if feat in ['popularity']:  # Add other targets if needed
+                    target_indices.append(i)
             
-            # Now predict
-            prediction = models['popularity'].predict(scaled_features)[0]
+            # Remove target columns from scaled features
+            if target_indices:
+                st.info(f"Removing target columns at indices: {target_indices}")
+                model_features = np.delete(scaled_features, target_indices, axis=1)
+                st.write(f"Model features shape after removing targets: {model_features.shape}")
+            else:
+                model_features = scaled_features
+                st.warning("No target columns found to remove")
+            
+            # CRITICAL: Verify model features has exactly 15 columns
+            if model_features.shape[1] != 15:
+                st.error(f"❌ Model features has {model_features.shape[1]} columns, model expects 15")
+                return
+            
+            # Now predict with the correct number of features
+            prediction = models['popularity'].predict(model_features)[0]
             
             st.success(f"🎵 Predicted Popularity: **{prediction:.1f}/100**")
             
@@ -632,6 +585,7 @@ def main():
 if __name__ == "__main__":
 
     main()
+
 
 
 
