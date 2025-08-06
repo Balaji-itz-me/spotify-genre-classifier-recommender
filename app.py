@@ -235,49 +235,205 @@ def create_feature_inputs():
         'tempo': tempo
     }
 
-def popularity_module():
-    """Popularity prediction module"""
-    st.header("🎯 Popularity Prediction")
+def debug_model_features(models, df_sample=None):
+    """Debug what features the model actually expects"""
+    st.subheader("🔍 Model Feature Debugging")
+    
+    # Check scaler features
+    if 'scaler' in models:
+        scaler = models['scaler']
+        st.write("**Scaler Information:**")
+        
+        if hasattr(scaler, 'feature_names_in_'):
+            st.write(f"✅ Scaler has feature_names_in_: {len(scaler.feature_names_in_)} features")
+            st.write("Features expected by scaler:")
+            for i, feature in enumerate(scaler.feature_names_in_, 1):
+                st.write(f"  {i}. {feature}")
+            return scaler.feature_names_in_.tolist()
+        else:
+            st.write("❌ Scaler doesn't have feature_names_in_")
+    
+    # Check dataset features
+    if df_sample is not None:
+        st.write("**Dataset Features:**")
+        st.write(f"Dataset has {len(df_sample.columns)} features")
+        numeric_cols = df_sample.select_dtypes(include=[np.number]).columns.tolist()
+        st.write(f"Numeric columns: {len(numeric_cols)}")
+        
+        # Show first few numeric columns
+        for col in numeric_cols[:20]:  # Show first 20
+            st.write(f"  - {col}")
+    
+    return None
+
+def get_exact_model_features(models, df_sample=None):
+    """Get the EXACT features the model expects"""
+    
+    # First, try to get from scaler
+    if 'scaler' in models and hasattr(models['scaler'], 'feature_names_in_'):
+        return models['scaler'].feature_names_in_.tolist()
+    
+    # If that fails, try to infer from the popularity model
+    if 'popularity' in models:
+        try:
+            # Some models store feature names
+            pop_model = models['popularity']
+            if hasattr(pop_model, 'feature_names_in_'):
+                return pop_model.feature_names_in_.tolist()
+        except:
+            pass
+    
+    # Manual reconstruction based on common patterns
+    # Since your model expects 15 features and needs 'cluster'
+    if df_sample is not None:
+        # Get numeric columns that are likely features
+        numeric_cols = df_sample.select_dtypes(include=[np.number]).columns.tolist()
+        
+        # Audio features (these are almost certainly included)
+        audio_features = ['danceability', 'energy', 'loudness', 'speechiness', 
+                         'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo']
+        
+        # Other likely features
+        other_features = ['duration_ms', 'explicit', 'key', 'mode', 'time_signature', 'cluster']
+        
+        # Build feature list from what's available
+        feature_list = []
+        
+        # Add audio features first (priority)
+        for feat in audio_features:
+            if feat in numeric_cols:
+                feature_list.append(feat)
+        
+        # Add other features
+        for feat in other_features:
+            if feat in numeric_cols:
+                feature_list.append(feat)
+        
+        # If we still don't have cluster, add it anyway (model needs it)
+        if 'cluster' not in feature_list:
+            feature_list.append('cluster')
+        
+        return feature_list[:15]  # Return exactly 15
+    
+    # Ultimate fallback - most common 15 features for music models
+    return [
+        'danceability', 'energy', 'loudness', 'speechiness', 
+        'acousticness', 'instrumentalness', 'liveness', 'valence', 
+        'tempo', 'duration_ms', 'key', 'mode', 'time_signature', 
+        'explicit', 'cluster'
+    ]
+
+def create_feature_dataframe(user_inputs, required_features, df_sample=None):
+    """Create feature DataFrame with EXACT column names and order"""
+    
+    # Default values for missing features
+    defaults = {
+        'duration_ms': 200000,
+        'explicit': 0,
+        'key': 5,
+        'mode': 1,
+        'time_signature': 4,
+        'cluster': 0,  # Essential - your model needs this
+        'popularity': 50,
+    }
+    
+    # Get median values from dataset if available
+    if df_sample is not None:
+        for feature in required_features:
+            if feature in df_sample.columns and feature not in user_inputs:
+                try:
+                    median_val = df_sample[feature].median()
+                    if pd.notna(median_val):
+                        defaults[feature] = float(median_val)
+                except:
+                    pass
+    
+    # Create feature dictionary in EXACT order
+    feature_dict = {}
+    for feature_name in required_features:
+        if feature_name in user_inputs:
+            feature_dict[feature_name] = user_inputs[feature_name]
+        elif feature_name in defaults:
+            feature_dict[feature_name] = defaults[feature_name]
+        else:
+            feature_dict[feature_name] = 0.0
+    
+    # Create DataFrame - CRITICAL: column names must match exactly
+    df = pd.DataFrame([feature_dict])
+    
+    # Ensure column order matches exactly
+    df = df[required_features]
+    
+    return df
+
+def safe_predict_popularity():
+    """Safe popularity prediction with proper debugging"""
+    st.header("🎯 Popularity Prediction (Debug Mode)")
     
     if 'models' not in st.session_state or 'popularity' not in st.session_state.models:
         st.error("Popularity model not available")
         return
     
+    # Debug section
+    with st.expander("🔍 Debug Model Features", expanded=True):
+        models = st.session_state.models
+        df_sample = st.session_state.df if 'df' in st.session_state else None
+        
+        expected_features = debug_model_features(models, df_sample)
+        
+        if expected_features:
+            st.success(f"✅ Found exact features: {len(expected_features)}")
+            required_features = expected_features
+        else:
+            st.warning("⚠️ Using inferred features")
+            required_features = get_exact_model_features(models, df_sample)
+        
+        st.write(f"**Will use these {len(required_features)} features:**")
+        for i, feat in enumerate(required_features, 1):
+            st.write(f"{i}. {feat}")
+    
+    # Get user inputs
     user_inputs = create_feature_inputs()
     
-    if st.button("Predict Popularity", type="primary"):
+    if st.button("🎯 Predict Popularity (Debug)", type="primary"):
         try:
             models = st.session_state.models
             df_sample = st.session_state.df if 'df' in st.session_state else None
             
-            # Get required features for the model
-            required_features = get_model_features(models['scaler'], df_sample)
+            # Get exact features
+            required_features = get_exact_model_features(models, df_sample)
             
-            # Ensure we have exactly 15 features (as expected by the model)
-            if len(required_features) != 15:
-                st.warning(f"Adjusting features: got {len(required_features)}, need 15")
-                required_features = required_features[:15]  # Take first 15
+            st.info(f"Using {len(required_features)} features: {required_features}")
             
-            # Create complete feature vector with defaults
-            features_df = create_complete_feature_vector(user_inputs, required_features, df_sample)
+            # Create feature DataFrame
+            features_df = create_feature_dataframe(user_inputs, required_features, df_sample)
             
-            # Verify feature count before prediction
-            if features_df.shape[1] != 15:
-                st.error(f"Feature mismatch: created {features_df.shape[1]} features, model expects 15")
-                return
+            st.write("**Created DataFrame:**")
+            st.write(f"Shape: {features_df.shape}")
+            st.write(f"Columns: {list(features_df.columns)}")
+            st.dataframe(features_df)
             
-            # Scale and predict
-            scaled = models['scaler'].transform(features_df)
+            # Check if features match what scaler expects
+            if hasattr(models['scaler'], 'feature_names_in_'):
+                scaler_features = models['scaler'].feature_names_in_.tolist()
+                if list(features_df.columns) == scaler_features:
+                    st.success("✅ Features match scaler exactly!")
+                else:
+                    st.error("❌ Feature mismatch with scaler!")
+                    st.write("DataFrame columns:", list(features_df.columns))
+                    st.write("Scaler expects:", scaler_features)
+                    return
             
-            # Verify scaled features
-            if scaled.shape[1] != 15:
-                st.error(f"Scaled feature mismatch: got {scaled.shape[1]}, expected 15")
-                return
-                
-            prediction = models['popularity'].predict(scaled)[0]
+            # Scale features
+            scaled_features = models['scaler'].transform(features_df)
+            st.write(f"Scaled features shape: {scaled_features.shape}")
+            
+            # Predict
+            prediction = models['popularity'].predict(scaled_features)[0]
             
             st.success(f"🎵 Predicted Popularity: **{prediction:.1f}/100**")
             
+            # Interpretation
             if prediction >= 70:
                 st.info("🔥 High popularity potential!")
             elif prediction >= 50:
@@ -285,23 +441,14 @@ def popularity_module():
             else:
                 st.info("📊 Niche appeal")
                 
-            # Show which features were used
-            with st.expander("🔍 Features Used"):
-                st.write(f"Using exactly {len(required_features)} features:")
-                for i, feature in enumerate(required_features, 1):
-                    st.write(f"{i}. {feature}")
-                
         except Exception as e:
-            st.error(f"Prediction failed: {e}")
-            with st.expander("Error Details"):
-                st.code(str(e))
-                st.write("Debug info:")
-                try:
-                    st.write(f"User inputs: {len(user_inputs)} features")
-                    st.write(f"Required features: {len(required_features) if 'required_features' in locals() else 'Unknown'}")
-                    st.write(f"Feature DF shape: {features_df.shape if 'features_df' in locals() else 'Not created'}")
-                except:
-                    pass
+            st.error(f"Prediction failed: {str(e)}")
+            st.exception(e)
+
+# Add this to your main function to replace popularity_module
+def popularity_module():
+    """Enhanced popularity module with debugging"""
+    safe_predict_popularity()
 
 def genre_module():
     """Genre classification module"""
@@ -469,3 +616,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
