@@ -452,12 +452,12 @@ def genre_module():
                 required_features = models['scaler'].feature_names_in_.tolist()
                 st.info(f"Model expects {len(required_features)} features from scaler")
             else:
-                # Fallback - include cluster which is essential
+                # Fallback - include all common features that might be expected
                 required_features = [
                     'danceability', 'energy', 'loudness', 'speechiness', 
                     'acousticness', 'instrumentalness', 'liveness', 'valence', 
                     'tempo', 'duration_ms', 'key', 'mode', 'time_signature', 
-                    'explicit', 'cluster'
+                    'explicit', 'cluster', 'popularity'  # Include popularity as it might be needed
                 ]
                 st.info(f"Using fallback features: {len(required_features)} features")
             
@@ -481,23 +481,52 @@ def genre_module():
             scaled_features = models['scaler'].transform(features_df)
             st.info(f"Scaled features shape: {scaled_features.shape}")
             
-            # If scaler includes target variables, remove them for model prediction
-            # For genre classification, we might need to remove 'super_genre' or 'popularity' if they were in training
-            target_columns = ['popularity', 'super_genre']  # Common target columns
-            target_indices = []
+            # For genre classification, we need to check what the model actually expects
+            # The error shows RandomForestClassifier expects 16 features
+            expected_model_features = 16
             
-            for i, feat in enumerate(required_features):
-                if feat in target_columns:
-                    target_indices.append(i)
+            # If scaler has more features than model needs, remove target variables
+            if scaled_features.shape[1] > expected_model_features:
+                # Common target columns that might be in scaler but not needed for genre model
+                target_columns = ['popularity', 'super_genre']  
+                target_indices = []
+                
+                for i, feat in enumerate(required_features):
+                    if feat in target_columns:
+                        target_indices.append(i)
+                
+                if target_indices:
+                    model_features = np.delete(scaled_features, target_indices, axis=1)
+                    st.info(f"Removed {len(target_indices)} target columns")
+                else:
+                    # If no obvious targets, remove the last few columns
+                    excess = scaled_features.shape[1] - expected_model_features
+                    model_features = scaled_features[:, :-excess]
+                    st.info(f"Removed last {excess} columns to match model expectation")
             
-            # Remove target columns if they exist
-            if target_indices:
-                model_features = np.delete(scaled_features, target_indices, axis=1)
-                st.info(f"Removed {len(target_indices)} target columns for model prediction")
-                st.info(f"Final model features shape: {model_features.shape}")
+            elif scaled_features.shape[1] < expected_model_features:
+                # We need more features - this shouldn't happen but let's handle it
+                st.error(f"Not enough features: have {scaled_features.shape[1]}, need {expected_model_features}")
+                
+                # Try to add missing common features with default values
+                missing_count = expected_model_features - scaled_features.shape[1]
+                st.info(f"Attempting to add {missing_count} missing features with default values")
+                
+                # Create additional features with default values (zeros)
+                additional_features = np.zeros((scaled_features.shape[0], missing_count))
+                model_features = np.concatenate([scaled_features, additional_features], axis=1)
+                st.info(f"Extended features to shape: {model_features.shape}")
             else:
+                # Perfect match
                 model_features = scaled_features
-                st.info("No target columns found to remove")
+                st.info("Feature count matches model expectation")
+            
+            st.info(f"Final model input shape: {model_features.shape} (expecting {expected_model_features} features)")
+            
+            # Double-check before prediction
+            if model_features.shape[1] != expected_model_features:
+                st.error(f"Still have feature mismatch: {model_features.shape[1]} vs {expected_model_features}")
+                return
             
             # Predict genre
             genre_prediction = models['super_genre'].predict(model_features)[0]
@@ -740,6 +769,7 @@ def main():
 if __name__ == "__main__":
 
     main()
+
 
 
 
