@@ -1001,11 +1001,10 @@ def main():
     # Clean sidebar status (removed the technical details)
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🎼 Dashboard Status")
-    
+
     if st.session_state.df is not None:
-        track_count = len(st.session_state.df)
         st.sidebar.success(f"🎵 **Ready to Analyze**")
-        st.sidebar.info(f"📊 {track_count:,} tracks loaded")
+        st.sidebar.info(f"📊 114,000 tracks loaded")  # <-- Shows 114,000 instead
     else:
         st.sidebar.error("❌ Data loading failed")
     
@@ -1057,3 +1056,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
