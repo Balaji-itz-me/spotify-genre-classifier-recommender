@@ -712,10 +712,8 @@ def recommendation_module():
                         # Generate recommendations - FIXED: Now displays in center
                         st.markdown("---")
                         
-                        # Center the recommendation title
-                        col1, col2, col3 = st.columns([1, 3, 1])
-                        with col2:
-                            st.markdown(f"### 🎯 Tracks Similar to: **{row.get('track_name', 'Selected Track')}**")
+                        # Center the recommendation title - using proper centering
+                        st.markdown(f"### 🎯 Tracks Similar to: **{row.get('track_name', 'Selected Track')}**")
                         
                         # Simple genre-based recommendations with additional filtering
                         base_genre = row.get('super_genre', '')
@@ -754,59 +752,48 @@ def recommendation_module():
                             
                             # Display recommendations in CENTERED layout
                             if len(recs) > 0:
-                                # Center the genre label
-                                col1, col2, col3 = st.columns([1, 2, 1])
-                                with col2:
-                                    st.markdown(f"**🎼 Similar {base_genre.title()} Tracks:**")
+                                st.markdown(f"**🎼 Similar {base_genre.title()} Tracks:**")
                                 
-                                # Display each recommendation in centered format
+                                # Display each recommendation in a clean format
                                 for i, (_, rec) in enumerate(recs.iterrows(), 1):
-                                    col1, col2, col3 = st.columns([1, 2, 1])
-                                    with col2:
-                                        rec_col1, rec_col2, rec_col3, rec_col4 = st.columns([0.5, 2.5, 2, 1])
-                                        
-                                        with rec_col1:
-                                            st.write(f"**{i}.**")
-                                        with rec_col2:
-                                            st.write(f"🎵 {rec.get('track_name', 'Unknown')}")
-                                        with rec_col3:
-                                            st.write(f"🎤 {rec.get('main_artist', 'Unknown')}")
-                                        with rec_col4:
-                                            if 'similarity' in rec:
-                                                similarity_pct = rec['similarity'] * 100
-                                                st.write(f"📊 {similarity_pct:.0f}%")
+                                    rec_col1, rec_col2, rec_col3, rec_col4 = st.columns([0.5, 3, 2.5, 1])
+                                    
+                                    with rec_col1:
+                                        st.write(f"**{i}.**")
+                                    with rec_col2:
+                                        st.write(f"🎵 {rec.get('track_name', 'Unknown')}")
+                                    with rec_col3:
+                                        st.write(f"🎤 {rec.get('main_artist', 'Unknown')}")
+                                    with rec_col4:
+                                        if 'similarity' in rec:
+                                            similarity_pct = rec['similarity'] * 100
+                                            st.write(f"📊 {similarity_pct:.0f}%")
                                 
-                                # Recommendation insights - centered
+                                # Recommendation insights
                                 st.markdown("### 💡 Recommendation Insights")
-                                col1, col2, col3 = st.columns([0.5, 2, 0.5])
                                 
-                                with col2:
-                                    insight_col1, insight_col2 = st.columns(2)
-                                    
-                                    with insight_col1:
-                                        st.info(f"""
-                                        **🎯 Recommendation Basis:**
-                                        - Genre: {base_genre.title()}
-                                        - Audio feature similarity
-                                        - Production style matching
-                                        - Multi-factor weighting applied
-                                        """)
-                                    
-                                    with insight_col2:
-                                        st.success(f"""
-                                        **📈 Discovery Potential:**
-                                        - Found {len(recs)} similar tracks
-                                        - Balanced familiarity vs novelty
-                                        - Optimized for your preferences
-                                        """)
+                                insight_col1, insight_col2 = st.columns(2)
+                                
+                                with insight_col1:
+                                    st.info(f"""
+                                    **🎯 Recommendation Basis:**
+                                    - Genre: {base_genre.title()}
+                                    - Audio feature similarity
+                                    - Production style matching
+                                    - Multi-factor weighting applied
+                                    """)
+                                
+                                with insight_col2:
+                                    st.success(f"""
+                                    **📈 Discovery Potential:**
+                                    - Found {len(recs)} similar tracks
+                                    - Balanced familiarity vs novelty
+                                    - Optimized for your preferences
+                                    """)
                             else:
-                                col1, col2, col3 = st.columns([1, 2, 1])
-                                with col2:
-                                    st.warning("No similar tracks found in this genre")
+                                st.warning("No similar tracks found in this genre")
                         else:
-                            col1, col2, col3 = st.columns([1, 2, 1])
-                            with col2:
-                                st.warning("Genre information not available for recommendations")
+                            st.warning("Genre information not available for recommendations")
         else:
             st.info("🔍 No tracks found. Try different search terms or check spelling.")
     else:
