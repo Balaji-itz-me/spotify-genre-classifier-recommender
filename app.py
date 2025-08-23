@@ -336,7 +336,7 @@ def popularity_module():
         **Predict your track's commercial success potential using AI**
         
         Our Random Forest model analyzes 15+ audio features to predict popularity scores (0-100).
-        Based on analysis of 81,000+ tracks with clear feature importance patterns.
+        Based on analysis of 114000+ tracks with clear feature importance patterns.
         """)
     
     with col2:
@@ -835,7 +835,7 @@ def dataset_overview():
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("**Total Tracks**", f"{len(df):,}")
+        st.metric("**Total Tracks**", "114,000")
     with col2:
         st.metric("**Unique Artists**", f"{df['main_artist'].nunique():,}")
     with col3:
@@ -1056,4 +1056,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
