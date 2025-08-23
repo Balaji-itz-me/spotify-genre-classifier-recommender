@@ -74,9 +74,21 @@ graph TD
     I --> J[Interactive Web Interface]
     J --> K[Business Insights<br/>Actionable Recommendations]
     
-    style A fill:#e1f5fe
-    style I fill:#f3e5f5
-    style K fill:#e8f5e8
+    %% Styles
+    style A fill:#0288d1,stroke:#01579b,stroke-width:2,color:#fff
+    style B fill:#4db6ac,stroke:#00796b,stroke-width:2,color:#fff
+    style C fill:#4db6ac,stroke:#00796b,stroke-width:2,color:#fff
+    
+    style D fill:#9575cd,stroke:#512da8,stroke-width:2,color:#fff
+    style E fill:#9575cd,stroke:#512da8,stroke-width:2,color:#fff
+    style F fill:#9575cd,stroke:#512da8,stroke-width:2,color:#fff
+    style G fill:#9575cd,stroke:#512da8,stroke-width:2,color:#fff
+    style H fill:#9575cd,stroke:#512da8,stroke-width:2,color:#fff
+    
+    style I fill:#ff7043,stroke:#e64a19,stroke-width:2,color:#fff
+    style J fill:#26a69a,stroke:#00796b,stroke-width:2,color:#fff
+    style K fill:#66bb6a,stroke:#2e7d32,stroke-width:2,color:#fff
+
 ```
 
 ### Key Features
