@@ -183,7 +183,7 @@ def show_app_overview():
     with col2:
         st.markdown("""
         **Data Processing**
-        - 81,000+ track dataset
+        - 114000 track dataset
         - 15+ audio feature dimensions
         - Scaled and normalized inputs
         - Multi-genre representation
@@ -956,7 +956,7 @@ def dataset_overview():
     with st.expander("🔍 Data Quality & Technical Details", expanded=False):
         st.markdown("""
         **📊 Dataset Characteristics:**
-        - **Size**: 81,000+ professionally curated tracks
+        - **Size**: 114000+ professionally curated tracks
         - **Features**: 15+ audio characteristics per track
         - **Quality**: Cleaned and preprocessed for ML
         - **Coverage**: Multiple genres, eras, and popularity levels
@@ -1025,7 +1025,7 @@ def main():
         "🎯 Popularity Prediction": "Focus on valence, vocals & production",
         "🎼 Genre Classification": "Include cluster info for best results", 
         "🎵 Music Recommendations": "Search for tracks you know well",
-        "📊 Dataset Insights": "Explore our 81K+ track database"
+        "📊 Dataset Insights": "Explore our 114k track database"
     }
     
     current_tip = tips.get(mode, "Explore AI-powered music analysis")
