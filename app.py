@@ -227,7 +227,7 @@ def create_feature_dataframe(user_inputs, required_features, df_sample=None):
         'key': 5,
         'mode': 1,
         'time_signature': 4,
-        'cluster': 0,
+        'cluster': 0,  # Default cluster value since we removed the UI control
         'popularity': 50,
     }
     
@@ -438,7 +438,7 @@ def popularity_module():
             st.error(f"❌ Prediction failed: {str(e)}")
 
 def genre_module():
-    """Enhanced genre classification module"""
+    """Enhanced genre classification module - REMOVED cluster selection"""
     st.header("🎼 Genre Classification")
     
     # Show insights
@@ -490,19 +490,8 @@ def genre_module():
         st.error("❌ Genre model not available")
         return
     
-    # Feature inputs
+    # Feature inputs (removed cluster selection completely)
     user_inputs = create_feature_inputs()
-    
-    # Additional settings
-    st.markdown("### 🎯 Additional Classification Settings")
-    cluster = st.selectbox(
-        "**Music Cluster** (Style/Pattern Group):",
-        options=list(range(10)),
-        index=0,
-        help="Different clusters represent distinct musical patterns and production styles"
-    )
-    
-    user_inputs['cluster'] = cluster
     
     # Classification
     if st.button("🎼 Classify Genre", type="primary", use_container_width=True):
@@ -510,7 +499,7 @@ def genre_module():
             models = st.session_state.models
             df_sample = st.session_state.df if 'df' in st.session_state else None
             
-            # Get required features and create DataFrame
+            # Get required features and create DataFrame (cluster will use default value)
             if 'scaler' in models and hasattr(models['scaler'], 'feature_names_in_'):
                 required_features = models['scaler'].feature_names_in_.tolist()
             else:
@@ -620,7 +609,7 @@ def genre_module():
             st.error(f"❌ Genre classification failed: {str(e)}")
 
 def recommendation_module():
-    """Enhanced recommendation module"""
+    """Enhanced recommendation module with centered display"""
     st.header("🎵 Smart Music Recommendations")
     
     # Show insights
@@ -720,9 +709,13 @@ def recommendation_module():
                     st.write(f"🎼 {genre}")
                 with col4:
                     if st.button(f"Get Recommendations", key=f"rec_{idx}", type="secondary"):
-                        # Generate recommendations
+                        # Generate recommendations - FIXED: Now displays in center
                         st.markdown("---")
-                        st.markdown(f"### 🎯 Tracks Similar to: **{row.get('track_name', 'Selected Track')}**")
+                        
+                        # Center the recommendation title
+                        col1, col2, col3 = st.columns([1, 3, 1])
+                        with col2:
+                            st.markdown(f"### 🎯 Tracks Similar to: **{row.get('track_name', 'Selected Track')}**")
                         
                         # Simple genre-based recommendations with additional filtering
                         base_genre = row.get('super_genre', '')
@@ -759,48 +752,61 @@ def recommendation_module():
                             else:
                                 recs = same_genre
                             
-                            # Display recommendations
+                            # Display recommendations in CENTERED layout
                             if len(recs) > 0:
-                                st.markdown(f"**🎼 Similar {base_genre.title()} Tracks:**")
+                                # Center the genre label
+                                col1, col2, col3 = st.columns([1, 2, 1])
+                                with col2:
+                                    st.markdown(f"**🎼 Similar {base_genre.title()} Tracks:**")
                                 
+                                # Display each recommendation in centered format
                                 for i, (_, rec) in enumerate(recs.iterrows(), 1):
-                                    col1, col2, col3, col4 = st.columns([1, 3, 2, 1])
-                                    
-                                    with col1:
-                                        st.write(f"**{i}.**")
+                                    col1, col2, col3 = st.columns([1, 2, 1])
                                     with col2:
-                                        st.write(f"🎵 {rec.get('track_name', 'Unknown')}")
-                                    with col3:
-                                        st.write(f"🎤 {rec.get('main_artist', 'Unknown')}")
-                                    with col4:
-                                        if 'similarity' in rec:
-                                            similarity_pct = rec['similarity'] * 100
-                                            st.write(f"📊 {similarity_pct:.0f}%")
+                                        rec_col1, rec_col2, rec_col3, rec_col4 = st.columns([0.5, 2.5, 2, 1])
+                                        
+                                        with rec_col1:
+                                            st.write(f"**{i}.**")
+                                        with rec_col2:
+                                            st.write(f"🎵 {rec.get('track_name', 'Unknown')}")
+                                        with rec_col3:
+                                            st.write(f"🎤 {rec.get('main_artist', 'Unknown')}")
+                                        with rec_col4:
+                                            if 'similarity' in rec:
+                                                similarity_pct = rec['similarity'] * 100
+                                                st.write(f"📊 {similarity_pct:.0f}%")
                                 
-                                # Recommendation insights
+                                # Recommendation insights - centered
                                 st.markdown("### 💡 Recommendation Insights")
-                                col1, col2 = st.columns(2)
-                                
-                                with col1:
-                                    st.info(f"""
-                                    **🎯 Recommendation Basis:**
-                                    - Genre: {base_genre.title()}
-                                    - Audio feature similarity
-                                    - Production style matching
-                                    - Multi-factor weighting applied
-                                    """)
+                                col1, col2, col3 = st.columns([0.5, 2, 0.5])
                                 
                                 with col2:
-                                    st.success(f"""
-                                    **📈 Discovery Potential:**
-                                    - Found {len(recs)} similar tracks
-                                    - Balanced familiarity vs novelty
-                                    - Optimized for your preferences
-                                    """)
+                                    insight_col1, insight_col2 = st.columns(2)
+                                    
+                                    with insight_col1:
+                                        st.info(f"""
+                                        **🎯 Recommendation Basis:**
+                                        - Genre: {base_genre.title()}
+                                        - Audio feature similarity
+                                        - Production style matching
+                                        - Multi-factor weighting applied
+                                        """)
+                                    
+                                    with insight_col2:
+                                        st.success(f"""
+                                        **📈 Discovery Potential:**
+                                        - Found {len(recs)} similar tracks
+                                        - Balanced familiarity vs novelty
+                                        - Optimized for your preferences
+                                        """)
                             else:
-                                st.warning("No similar tracks found in this genre")
+                                col1, col2, col3 = st.columns([1, 2, 1])
+                                with col2:
+                                    st.warning("No similar tracks found in this genre")
                         else:
-                            st.warning("Genre information not available for recommendations")
+                            col1, col2, col3 = st.columns([1, 2, 1])
+                            with col2:
+                                st.warning("Genre information not available for recommendations")
         else:
             st.info("🔍 No tracks found. Try different search terms or check spelling.")
     else:
@@ -1022,7 +1028,7 @@ def main():
     tips = {
         "🏠 App Overview": "Start here for complete feature overview",
         "🎯 Popularity Prediction": "Focus on valence, vocals & production",
-        "🎼 Genre Classification": "Include cluster info for best results", 
+        "🎼 Genre Classification": "Simplified audio feature analysis", 
         "🎵 Music Recommendations": "Search for tracks you know well",
         "📊 Dataset Insights": "Explore our 114k track database"
     }
@@ -1056,5 +1062,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
