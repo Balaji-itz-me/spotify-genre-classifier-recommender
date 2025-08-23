@@ -142,17 +142,14 @@ graph TD
 - **Silhouette Score**: 0.155
 - **Result**: 5 meaningful musical clusters with distinct characteristics
 
-![Cluster Analysis Visualization](images/cluster_analysis_3d.png)
+![Cluster Analysis Visualization](cluster_png/3D_pca_clustering.png)
 *3D visualization of music clusters showing distinct groupings based on audio features*
-
-![DBSCAN Clustering Results](images/dbscan_clustering.png)
-*DBSCAN clustering comparison showing density-based groupings*
 
 ## Key Research Findings
 
 ### Feature Importance Analysis
 
-![SHAP Feature Importance](images/shap_feature_importance.png)
+![SHAP Feature Importance](feature_importance_png/shap_popularity.png)
 *SHAP analysis revealing the most influential features for popularity prediction*
 
 **Primary Drivers (High Impact)**:
@@ -165,16 +162,16 @@ graph TD
 
 ### Temporal Trends (1990-2022)
 
-![Valence Trend Analysis](images/valence_trend_forecast.png)
+![Valence Trend Analysis](trend_analysis_png/forecast_valence.png)
 *Historical valence trends and future predictions showing U-shaped pattern*
 
 **Valence (Musical Positivity)**
 - **Pattern**: U-shaped curve
-- **1990-2005**: Gradual decline in positivity
+- **1990-2005**: Gradual decline in positivity 
 - **2005-2022**: Steady recovery
 - **Future Forecast**: Continued upward trend (post-pandemic optimism)
 
-![Tempo Trend Analysis](images/tempo_trend_forecast.png)
+![Tempo Trend Analysis](trend_analysis_png/forecast_tempo.png)
 *Tempo evolution over time with Prophet forecasting model predictions*
 
 **Tempo Evolution**
@@ -317,8 +314,8 @@ pip package manager
 ### Installation Steps
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/music-analysis-dashboard.git
-cd music-analysis-dashboard
+git clone https://github.com/Balaji-itz-me/spotify-genre-classifier-recommender.git
+cd spotify-genre-classifier-recommender
 
 # Install dependencies
 pip install -r requirements.txt
@@ -431,7 +428,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ```bash
 # Fork the repository
 # Clone your fork
-git clone https://github.com/yourusername/music-analysis-dashboard.git
+git clone https://github.com/Balaji-itz-me/spotify-genre-classifier-recommender.git
 
 # Create feature branch
 git checkout -b feature/amazing-feature
@@ -469,17 +466,25 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Author
 
-**[Your Name]**
+**[BALAJI K]**
 
-Data Scientist & Music Technology Enthusiast
 
 - **Portfolio**: [https://yourportfolio.com](https://yourportfolio.com)
-- **LinkedIn**: [linkedin.com/in/yourprofile](https://linkedin.com/in/yourprofile)
-- **GitHub**: [github.com/yourusername](https://github.com/yourusername)
-- **Email**: your.email@example.com
+- **LinkedIn**: [linkedin.com/in/balaji-k-626613157/](https://www.linkedin.com/in/balaji-k-626613157/)
+- **GitHub**: [github.com/Balaji-itz-me](https://github.com/Balaji-itz-me)
+- **Email**: balajikamaraj99@gmail.com
 - **Medium**: [medium.com/@yourusername](https://medium.com/@yourusername)
 
-*Passionate about leveraging data science and machine learning to unlock insights in the music industry. Combining technical expertise with domain knowledge to create impactful solutions for artists, producers, and music professionals.*
+## Project Statistics
+
+![GitHub stars](https://img.shields.io/github/stars/Balaji-itz-me/spotify-genre-classifier-recommender?style=social)
+![GitHub forks](https://img.shields.io/github/forks/Balaji-itz-me/spotify-genre-classifier-recommender?style=social)
+![GitHub issues](https://img.shields.io/github/issues/Balaji-itz-me/spotify-genre-classifier-recommender)
+![GitHub license](https://img.shields.io/github/license/Balaji-itz-me/spotify-genre-classifier-recommender)
+![GitHub last commit](https://img.shields.io/github/last-commit/Balaji-itz-me/spotify-genre-classifier-recommender)
+![Python Version](https://img.shields.io/badge/python-3.11-blue.svg)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+![Open Source Love](https://badges.frapsoft.com/os/v1/open-source.svg?v=103)
 
 ---
 
