@@ -8,6 +8,14 @@ An intelligent music analytics platform combining machine learning, trend analys
 ![Dataset](https://img.shields.io/badge/dataset-114k%20tracks-orange.svg)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)
 
+## Live Demo
+
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://spotify-genre-classifier-recommender-5lkprqoqqnb2d6nnqukrpp.streamlit.app/)
+
+**Experience the full interactive dashboard:** [Music Analysis Dashboard](https://spotify-genre-classifier-recommender-5lkprqoqqnb2d6nnqukrpp.streamlit.app/)
+
+*Click the badge above or the link to access the live Streamlit application and explore all features in real-time.*
+
 ## Table of Contents
 1. [Problem Statement](#problem-statement)
 2. [Project Overview](#project-overview)
